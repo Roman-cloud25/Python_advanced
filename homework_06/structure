@@ -1,0 +1,13 @@
+homework_06/
+├── migrations/          # Alembic directory (stores database migration history)
+│   ├── versions/        # Individual migration scripts
+│   └── env.py           # Alembic environment configuration script
+├── .gitignore           # Specifies files and folders for Git to ignore
+├── alembic.ini          # Main Alembic configuration file
+├── crud.py              # CRUD operations (Create, Read, Update, Delete logic)
+├── database.py          # SQLAlchemy engine and session configuration
+├── main.py              # FastAPI application entry point and routes
+├── models.py            # SQLAlchemy database models (Table definitions)
+├── schemas.py           # Pydantic models (Data validation and serialization)
+├── requirements.txt     # List of project dependencies and libraries
+└── README.md            # Project documentation and setup guide
