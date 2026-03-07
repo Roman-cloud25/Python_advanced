@@ -8,14 +8,18 @@ engine = create_engine(
     echo=True,
     future=True
 )
+
+
 class Base(DeclarativeBase):
     pass
+
 
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,
     autocommit=False
 )
+
 
 def get_db():
     db = SessionLocal()
