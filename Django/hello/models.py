@@ -8,6 +8,13 @@ class Category(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    # contains metadata
+    class Meta:
+        # name: table
+        db_table = 'task_manager_category'
+        verbose_name = 'Category'
+        verbose_name_plural = 'Categories'
+
 
 class Task(models.Model):
 
@@ -36,8 +43,18 @@ class Task(models.Model):
     # created_at: automatically stores creation date and time
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self) -> str:
+        return self.title
+
+    # model settings
     class Meta:
+        # database limitations
         constraints = [models.UniqueConstraint(fields=["title", "deadline"], name="unique_task_per_day")]
+        db_table = 'task_manager_task'
+        # default sorting
+        ordering = ['-created_at']
+        verbose_name = 'Task'
+        verbose_name_plural = 'Tasks'
 
     def __str__(self) -> str:
         return self.title
@@ -70,3 +87,10 @@ class SubTask(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+    # model settings
+    class Meta:
+        db_table = 'task_manager_subtask'
+        ordering = ['-created_at']
+        verbose_name = 'SubTask'
+        verbose_name_plural = 'SubTasks'
