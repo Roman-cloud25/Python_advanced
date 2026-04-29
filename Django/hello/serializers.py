@@ -2,6 +2,19 @@ from rest_framework import serializers
 from django.utils import timezone
 from .models import Task, SubTask, Category
 
+# Serializer for the Category model
+class CategorySerializer(serializers.ModelSerializer):
+    tasks_count = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'is_deleted', 'deleted_at', 'tasks_count']
+        read_only_fields = ['id', 'is_deleted', 'deleted_at']
+
+    # Returns the number of tasks associated with this category
+    def get_tasks_count(self, obj):
+        return obj.task.count()
+
 
 # Serializer for the Task model
 class TaskSerializer(serializers.ModelSerializer):

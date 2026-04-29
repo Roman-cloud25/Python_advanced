@@ -1,5 +1,10 @@
-from django.urls import path
+from django.urls import path, include
 from . import views_api
+from rest_framework.routers import DefaultRouter
+
+# Router for categories
+router = DefaultRouter()
+router.register(r'categories', views_api.CategoryViewSet, basename='category')
 
 # Router
 urlpatterns = [
@@ -15,3 +20,5 @@ urlpatterns = [
     path('tasks/statistics/', views_api.task_statistics, name='task-statistics'),
 
 ]
+
+urlpatterns += router.urls

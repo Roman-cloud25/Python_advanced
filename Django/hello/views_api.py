@@ -1,15 +1,69 @@
-from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework import status,viewsets
+from rest_framework.decorators import api_view, action
 from rest_framework.views import APIView
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
-from django.utils import timezone
-from django.core.paginator import Paginator, EmptyPage
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.filters import SearchFilter, OrderingFilter
+from django.utils import timezone
+from django.core.paginator import Paginator, EmptyPage
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Task, SubTask
-from .serializers import TaskSerializer, SubTaskCreateSerializer
+from .models import Task, SubTask, Category
+from .serializers import TaskSerializer, SubTaskCreateSerializer, CategorySerializer
+
+
+# ViewSet for CRUD operations with categories
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+    # Counting tasks in a category
+    @action(detail=True, methods=['get'], url_path='count-tasks')
+    # Returns the number of tasks in the specified category
+    def count_tasks(self, request, pk=None):
+        category = self.get_object()
+        tasks_count = category.task.count()
+
+        return Response({
+            'category_id': category.id,
+            'category_name': category.name,
+            'tasks_count': tasks_count
+        })
+
+    # View deleted categories
+    @action(detail=False, methods=['get'], url_path='deleted')
+    # Returns a list of only deleted categories
+    def deleted_categories(self, request):
+        deleted_cats = Category.objects.deleted_only()
+        serializer = self.get_serializer(deleted_cats, many=True)
+        return Response(serializer.data)
+
+    # Category restoration
+    @action(detail=True, methods=['post'], url_path='restore')
+    # Restores a soft deleted category
+    def restore_category(self, request, pk=None):
+        category = Category.objects.all_with_deleted().get(id=pk)
+        if not category.is_deleted:
+            return Response(
+                {'error': 'The category was not deleted'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        category.restore()
+        serializer = self.get_serializer(category)
+        return Response(serializer.data)
+
+
+
+
+
+
+
+
+
+
+
 
 # Task statistics (GET)
 @api_view(['GET'])
