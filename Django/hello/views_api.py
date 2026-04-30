@@ -55,16 +55,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-
-
-
-
-
-
-
-
-
-
 # Task statistics (GET)
 @api_view(['GET'])
 def task_statistics(request):
