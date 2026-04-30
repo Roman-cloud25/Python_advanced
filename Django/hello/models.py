@@ -1,12 +1,49 @@
 from django.db import models
+from django.utils import timezone
+
+
+# Delete
+class SoftDeleteManager(models.Manager):
+    # Returns only non-deleted entries
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+    # Returns all entries, including deleted ones
+    def all_with_deleted(self):
+        return super().get_queryset()
+
+    # Returns only deleted entries
+    def deleted_only(self):
+        return super().get_queryset().filter(is_deleted=True)
+
 
 # Create your models here.
 class Category(models.Model):
     # name: category name
     name = models.CharField(max_length=100, unique=True)
 
+    # Soft delete field
+    # Is the category deleted?
+    is_deleted = models.BooleanField(default=False)
+    # When was it deleted?
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = SoftDeleteManager()
+
     def __str__(self) -> str:
         return self.name
+
+    # Soft delete mark as deleted
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
+
+    # Restores
+    def restore(self):
+        self.is_deleted = False
+        self.deleted_at = None
+        self.save()
 
     # contains metadata
     class Meta:
@@ -84,9 +121,6 @@ class SubTask(models.Model):
 
     # created_at: automatically stores creation date and time
     created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self) -> str:
-        return self.title
 
     # model settings
     class Meta:
