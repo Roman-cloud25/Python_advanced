@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage
 from django_filters.rest_framework import DjangoFilterBackend
@@ -17,6 +18,7 @@ from .serializers import TaskSerializer, SubTaskCreateSerializer, CategorySerial
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
 
     # Counting tasks in a category
     @action(detail=True, methods=['get'], url_path='count-tasks')
@@ -58,6 +60,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 # Task statistics (GET)
 @api_view(['GET'])
 def task_statistics(request):
+    permission_classes = [IsAuthenticated]
     # Total number of tasks
     total_tasks = Task.objects.count()
     # Number of task for each status
@@ -89,12 +92,13 @@ class TaskListCreateView(ListCreateAPIView):
     search_fields = ['title', 'description']
     ordering_fields = ['created_at']
     ordering = ['-created_at']
-
+    permission_classes = [IsAuthenticated]
 
 # GET: task by ID, PUT, PATCH, DELETE
 class TaskRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated]
 
 
 # GET:list all SubTask, POST:create a new SubTask
@@ -106,10 +110,10 @@ class SubTaskListCreateView(ListCreateAPIView):
     search_fields = ['title', 'description']
     ordering_fields = ['created_at']
     ordering = ['-created_at']
-
+    permission_classes = [IsAuthenticated]
 
 # GET: task by ID, PUT, PATCH, DELETE
 class SubTaskRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
     queryset = SubTask.objects.all()
     serializer_class = SubTaskCreateSerializer
-
+    permission_classes = [IsAuthenticated]
