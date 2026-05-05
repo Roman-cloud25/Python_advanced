@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.conf import settings
 
 
 # Delete
@@ -80,6 +81,21 @@ class Task(models.Model):
     # created_at: automatically stores creation date and time
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # New field task owner
+    owner = models.ForeignKey(
+        # reference to the User model
+        settings.AUTH_USER_MODEL,
+        # If a user is deleted all their tasks are also deleted
+        on_delete=models.CASCADE,
+        # All tasks user
+        related_name='tasks',
+        # Field can be empty
+        null=True,
+        # Field can be empty in forms
+        blank=True
+    )
+
+
     def __str__(self) -> str:
         return self.title
 
@@ -121,6 +137,15 @@ class SubTask(models.Model):
 
     # created_at: automatically stores creation date and time
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # New field SubTask owner
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='subtasks',
+        null=True,
+        blank=True
+    )
 
     # model settings
     class Meta:

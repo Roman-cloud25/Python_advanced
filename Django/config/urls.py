@@ -16,9 +16,23 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from rest_framework import permissions
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+
 
 urlpatterns = [
+    # Swagger documentation
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+path('swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui-root'),
+
+    # Route for the admin panel
     path('admin/', admin.site.urls),
+    # URLs from the app
     path("", include("hello.urls")),
+    # API URLs from the app
     path('api/', include('hello.urls_api')),
+
+
 ]

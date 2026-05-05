@@ -25,6 +25,10 @@ urlpatterns = [
     # Statistics
     path('tasks/statistics/', views_api.task_statistics, name='task-statistics'),
 
+    # My Task, SubTask
+    path('my-tasks/', views_api.my_tasks, name='my-tasks'),
+    path('my-subtasks/', views_api.my_subtasks, name='my-subtasks')
 ]
 
+# Connecting category routes from ViewSet
 urlpatterns += router.urls

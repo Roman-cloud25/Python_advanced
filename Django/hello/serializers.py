@@ -12,7 +12,7 @@ class CategorySerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'is_deleted', 'deleted_at']
 
     # Returns the number of tasks associated with this category
-    def get_tasks_count(self, obj):
+    def get_tasks_count(self, obj) -> int:
         return obj.task.count()
 
 
@@ -20,15 +20,15 @@ class CategorySerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
-        fields = ['id', 'title', 'description', 'status', 'deadline']
-
+        fields = ['id', 'title', 'description', 'status', 'deadline', 'owner']
+        read_only_fields = ['owner']
 
 # Serializer for creating a SubTask
 class SubTaskCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubTask
-        fields = ['id', 'title', 'description', 'task', 'status', 'deadline', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'title', 'description', 'task', 'status', 'deadline', 'created_at', 'owner']
+        read_only_fields = ['id', 'created_at', 'owner']
 
 
 # Serializer for a category with uniqueness checking
@@ -59,8 +59,8 @@ class CategoryCreateSerializer(serializers.ModelSerializer):
 class SubTaskForTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubTask
-        fields = ['id', 'title', 'description', 'task', 'status', 'deadline', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'title', 'description', 'task', 'status', 'deadline', 'created_at', 'owner']
+        read_only_fields = ['id', 'created_at', 'owner']
 
 
 # Nested serializer to display all SubTasks of a task
@@ -68,16 +68,16 @@ class TaskDetailSerializer(serializers.ModelSerializer):
     subtasks = SubTaskForTaskSerializer(many=True, read_only=True)
     class Meta:
         model = Task
-        fields = ['id', 'title', 'description', 'categories', 'status', 'deadline', 'created_at', 'subtasks']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'title', 'description', 'categories', 'status', 'deadline', 'created_at', 'subtasks', 'owner']
+        read_only_fields = ['id', 'created_at', 'owner']
 
 
 # Validation deadline
 class TaskCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
-        fields = ['id', 'title', 'description', 'categories', 'status', 'deadline', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'title', 'description', 'categories', 'status', 'deadline', 'created_at', 'owner']
+        read_only_fields = ['id', 'created_at', 'owner']
 
 
     # Validation of the deadline field
