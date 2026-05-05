@@ -4,3 +4,4 @@ from .views import hello_view
 urlpatterns = [
     path("hello/", hello_view, name="hello"),
 ]
+

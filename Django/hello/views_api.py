@@ -1,139 +1,78 @@
-from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework import status,viewsets
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.openapi import OpenApiTypes
+import typing
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage
-
-from .models import Task, SubTask
-from .serializers import TaskSerializer, SubTaskCreateSerializer
-
-
-# Task list with filtering by day of the week
-@api_view(['GET'])
-def task_list(request):
-    weekday_param = request.query_params.get('weekday')
-    tasks = Task.objects.all()
-
-    if weekday_param:
-        weekday_number = _get_weekday_number(weekday_param)
-        if weekday_number:
-            tasks = tasks.filter(deadline__week_day=weekday_number)
-
-    tasks = tasks.order_by('-created_at')
-    serializer = TaskSerializer(tasks, many=True)
-    return Response(serializer.data)
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import Task, SubTask, Category
+from .serializers import TaskSerializer, SubTaskCreateSerializer, CategorySerializer
+from .permissions import IsOwnerOrReadOnly
 
 
-# Day of the week name into number
-def _get_weekday_number(weekday_name):
-    weekdays = {
-        'monday':1,
-        'tuesday': 2,
-        'wednesday': 3,
-        'thursday': 4,
-        'friday': 5,
-        'saturday': 6,
-        'sunday': 7
-    }
-    return weekdays.get(weekday_name.lower(), None)
+# ViewSet for CRUD operations with categories
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
 
+    # Counting tasks in a category
+    @action(detail=True, methods=['get'], url_path='count-tasks')
+    # Returns the number of tasks in the specified category
+    def count_tasks(self, request, pk=None):
+        category = self.get_object()
+        tasks_count = category.task.count()
 
-# Pagination of more than 5 objects
-class SubTaskListCreateView(APIView):
-    def get(self, request):
-        page_size = 5
-        page_number = request.query_params.get('page', 1)
-        try:
-            page_number = int(page_number)
-        except ValueError:
-            page_number = 1
-
-        task_title = request.query_params.get('task_title')
-        status_filter = request.query_params.get('status')
-        subtasks = SubTask.objects.all()
-        if task_title:
-            subtasks = subtasks.filter(task_title_icontains=task_title)
-        if status_filter:
-            subtasks = subtasks.filter(status=status_filter)
-        subtasks = subtasks.order_by('-created_at')
-
-        paginator = Paginator(subtasks, page_size)
-        try:
-            page_obj = paginator.page(page_number)
-        except EmptyPage:
-            return Response({
-                'count': paginator.count,
-                'page': page_number,
-                'total_pages': paginator.num_pages,
-                'results': []
-            })
-
-        serializer = SubTaskCreateSerializer(page_obj, many=True)
         return Response({
-            'count': paginator.count,
-            'page': page_number,
-            'total_pages': paginator.num_pages,
-            'results': serializer.data
+            'category_id': category.id,
+            'category_name': category.name,
+            'tasks_count': tasks_count
         })
 
-# Creating a new SubTask
-    def post(self, request):
-        serializer = SubTaskCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # View deleted categories
+    @action(detail=False, methods=['get'], url_path='deleted')
+    # Returns a list of only deleted categories
+    def deleted_categories(self, request):
+        deleted_cats = Category.objects.deleted_only()
+        serializer = self.get_serializer(deleted_cats, many=True)
+        return Response(serializer.data)
+
+    # Category restoration
+    @action(detail=True, methods=['post'], url_path='restore')
+    # Restores a soft deleted category
+    def restore_category(self, request, pk=None):
+        category = Category.objects.all_with_deleted().get(id=pk)
+        if not category.is_deleted:
+            return Response(
+                {'error': 'The category was not deleted'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        category.restore()
+        serializer = self.get_serializer(category)
+        return Response(serializer.data)
 
 
-
-
-
-
-
-
-
-
-
-
-
-# POST
-@api_view(['POST'])
-def create_task(request):
-    serializer = TaskSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        # Created object in JSON
-        return Response(
-            serializer.data, status=status.HTTP_201_CREATED
-        )
-    # Information is not valid
-    return Response(
-        serializer.errors, status=status.HTTP_400_BAD_REQUEST
-    )
-
-
-# GET
-# @api_view(['GET'])
-# def task_list(request):
-#     tasks = Task.objects.all()
-#     # Serializing a task list to JSON
-#     serializer = TaskSerializer(tasks, many=True)
-#     return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-# ID GET
-@api_view(['GET'])
-def task_detail(request, task_id):
-    try:
-        task = Task.objects.get(id=task_id)
-    except Task.DoesNotExist:
-        raise NotFound(f"Task with ID {task_id} not found")
-
-    # Serialize the task to JSON
-    serializer = TaskSerializer(task)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+# Schema
+@extend_schema(
+    responses={
+        200: {
+            'type': 'object',
+            'properties': {
+                'total_tasks': {'type': 'integer'},
+                'status_breakdown': {'type': 'object'},
+                'overdue_tasks': {'type': 'integer'},
+            }
+        }
+    }
+)
 
 
 # Task statistics (GET)
@@ -150,9 +89,8 @@ def task_statistics(request):
     # Number of overdue tasks
     current_time = timezone.now()
     overdue_tasks = Task.objects.filter(
-        deadline__lt=current_time).exclude(
-        status=Task.Status.DONE
-    ).count()
+        deadline__lt=current_time
+    ).exclude(status=Task.Status.DONE).count()
 
     return Response({
         'total_tasks': total_tasks,
@@ -161,89 +99,80 @@ def task_statistics(request):
     })
 
 
-# # List of SubTasks
-# class SubTaskListCreateView(APIView):
-#     # GET: list of all SubTasks
-#     def get(self, request):
-#         subtasks = SubTask.objects.all()
-#         serializer = SubTaskCreateSerializer(subtasks, many=True)
-#         return Response(serializer.data, status=status.HTTP_200_OK)
+# GET:list all task, POST:create a new task
+class TaskListCreateView(ListCreateAPIView):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status', 'deadline']
+    search_fields = ['title', 'description']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
 
-    # # POST: create a new Subtask
-    # def post(self, request):
-    #     serializer = SubTaskCreateSerializer(data=request.data)
-    #     if serializer.is_valid():
-    #         serializer.save()
-    #         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Automatic installation owner
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
 
-
-# Update, Delete SubTask
-class SubTaskDetailUpdateDeleteView(APIView):
-    # Find SubTask
-    def get_object(self, pk):
-        try:
-            return SubTask.objects.get(id=pk)
-        except SubTask.DoesNotExist:
-            raise NotFound("Subtask not found")
-
-    # GET: SubTask
-    def get(self, request, pk):
-        subtask = self.get_object(pk)
-        serializer = SubTaskCreateSerializer(subtask)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    # Update SubTask
-    def put(self, request, pk):
-        subtask=self.get_object(pk)
-        serializer = SubTaskCreateSerializer(subtask, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    # Partial SubTask update
-    def patch(self, request, pk):
-        subtask = self.get_object(pk)
-        serializer = SubTaskCreateSerializer(subtask, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    # DELETE: delete SubTask
-    def delete(self, request, pk):
-        subtask = self.get_object(pk)
-        subtask.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    # Return only the tasks of the current user
+    def get_queryset(self):
+        return Task.objects.filter(owner=self.request.user)
 
 
+# GET: task by ID, PUT, PATCH, DELETE
+class TaskRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
+    serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated]
+
+    # Return only the tasks of the  current user
+    def get_queryset(self):
+        return Task.objects.filter(owner=self.request.user)
 
 
+# GET:list all SubTask, POST:create a new SubTask
+class SubTaskListCreateView(ListCreateAPIView):
+    queryset = SubTask.objects.all()
+    serializer_class = SubTaskCreateSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status', 'deadline']
+    search_fields = ['title', 'description']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+
+    # Override
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+    # Override
+    def get_queryset(self):
+        return SubTask.objects.filter(owner=self.request.user)
 
 
+# GET: SubTask by ID, PUT, PATCH, DELETE
+class SubTaskRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
+    serializer_class = SubTaskCreateSerializer
+    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+
+    # Override
+    def get_queryset(self):
+        return SubTask.objects.filter(owner=self.request.user)
+
+# GET: return all tasks for the current user
+@extend_schema(responses=TaskSerializer(many=True))
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_tasks(request):
+    tasks = Task.objects.filter(owner=request.user).order_by('-created_at')
+    serializer = TaskSerializer(tasks, many=True)
+    return Response(serializer.data)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# GET: return all SubTask for the current user
+@extend_schema(responses=SubTaskCreateSerializer(many=True))
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_subtasks(request):
+    subtasks = SubTask.objects.filter(owner=request.user).order_by('-created_at')
+    serializer = SubTaskCreateSerializer(subtasks, many=True)
+    return Response(serializer.data)
