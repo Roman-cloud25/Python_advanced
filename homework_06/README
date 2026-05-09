@@ -2,14 +2,13 @@
 
 A FastAPI-based API for managing categories and questions with a **one-to-many** database relationship (one category can have multiple questions).
 
----
 
 ## Features
 
 - **Database Models**: Implemented `categories` and `questions` tables using **SQLAlchemy 2.0**.
 - **Migrations**: Configured **Alembic** for database schema versioning.
 - **REST API**: FastAPI endpoints for:
-  - Creating categories
-  - Adding questions
-  - Fetching all questions
+  - Full CRUD for categories (Create, Read, Update, Delete)
+  - Creating questions with category assignment
+  - Fetching all questions with nested category data
 - **Data Validation**: Used **Pydantic** for request/response schema validation.
