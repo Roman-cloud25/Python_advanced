@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
 import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -43,8 +44,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'django_filters',
+    'drf_yasg',
+    'rest_framework_simplejwt.token_blacklist',
     'hello',
-
 ]
 
 MIDDLEWARE = [
@@ -131,3 +134,41 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'hello.authentication.CookieJWTAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 5,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
+}
+
+# JWT Configuration
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'JTI_CLAIM': 'jti',
+
+    # Cookies settings
+    'ACCESS_TOKEN_COOKIE_NAME': 'access_token',
+    'REFRESH_TOKEN_COOKIE_NAME': 'refresh_token',
+    'ACCESS_TOKEN_COOKIE_HTTPONLY': True,
+    'ACCESS_TOKEN_COOKIE_SECURE': False,
+    'ACCESS_TOKEN_COOKIE_SAMESITE': 'Lax',
+
+}

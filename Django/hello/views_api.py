@@ -1,13 +1,40 @@
-from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework import status, viewsets
+from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+from .serializers import RegisterSerializer
+from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
+from datetime import timedelta
 from django.core.paginator import Paginator, EmptyPage
+from django.contrib.auth import authenticate
+from django.http import JsonResponse
 
-from .models import Task, SubTask
-from .serializers import TaskSerializer, SubTaskCreateSerializer
+from .models import Task, SubTask, Category
+from .serializers import TaskSerializer, SubTaskCreateSerializer, CategorySerializer
+
+
+# Generic Views for Task
+class TaskListCreateView(ListCreateAPIView):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status', 'deadline']
+    search_fields = ['title', 'description']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+
+
+# Endpoint for retrieving, updating or deleting a task instance
+class TaskRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
 
 
 # Task list with filtering by day of the week
@@ -29,7 +56,7 @@ def task_list(request):
 # Day of the week name into number
 def _get_weekday_number(weekday_name):
     weekdays = {
-        'monday':1,
+        'monday': 1,
         'tuesday': 2,
         'wednesday': 3,
         'thursday': 4,
@@ -78,24 +105,13 @@ class SubTaskListCreateView(APIView):
             'results': serializer.data
         })
 
-# Creating a new SubTask
+    # Creating a new SubTask
     def post(self, request):
         serializer = SubTaskCreateSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
-
-
-
-
-
-
-
 
 
 # POST
@@ -112,15 +128,6 @@ def create_task(request):
     return Response(
         serializer.errors, status=status.HTTP_400_BAD_REQUEST
     )
-
-
-# GET
-# @api_view(['GET'])
-# def task_list(request):
-#     tasks = Task.objects.all()
-#     # Serializing a task list to JSON
-#     serializer = TaskSerializer(tasks, many=True)
-#     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 # ID GET
@@ -161,23 +168,6 @@ def task_statistics(request):
     })
 
 
-# # List of SubTasks
-# class SubTaskListCreateView(APIView):
-#     # GET: list of all SubTasks
-#     def get(self, request):
-#         subtasks = SubTask.objects.all()
-#         serializer = SubTaskCreateSerializer(subtasks, many=True)
-#         return Response(serializer.data, status=status.HTTP_200_OK)
-
-    # # POST: create a new Subtask
-    # def post(self, request):
-    #     serializer = SubTaskCreateSerializer(data=request.data)
-    #     if serializer.is_valid():
-    #         serializer.save()
-    #         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 # Update, Delete SubTask
 class SubTaskDetailUpdateDeleteView(APIView):
     # Find SubTask
@@ -195,7 +185,7 @@ class SubTaskDetailUpdateDeleteView(APIView):
 
     # Update SubTask
     def put(self, request, pk):
-        subtask=self.get_object(pk)
+        subtask = self.get_object(pk)
         serializer = SubTaskCreateSerializer(subtask, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -218,32 +208,157 @@ class SubTaskDetailUpdateDeleteView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# Registering a new user
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register(request):
+    # Passing request data to the serializer
+    serializer = RegisterSerializer(data=request.data)
+
+    # Validate data
+    if serializer.is_valid():
+        # Saving the user
+        user = serializer.save()
+
+        # Answer
+        return Response({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'message': 'User successfully registered'
+        }, status=status.HTTP_201_CREATED)
+
+    # Return errors on validation failure
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Login
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login(request):
+    # Data from the request
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    # Validation: username and password are required
+    if not username or not password:
+        return Response({
+            'error': 'Username and password are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # User Aunthentication
+    user = authenticate(username=username, password=password)
+
+    # Validate user existens and password
+    if user is None:
+        return Response({
+            'error': 'Incorrect username or password'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Create JWT Token
+    refresh = RefreshToken.for_user(user)
+    access_token = str(refresh.access_token)
+    refresh_token = str(refresh)
+
+    # Reply
+    response = Response({
+        'message': 'Login successful',
+        'user_id': user.id,
+        'username': user.username
+    }, status=status.HTTP_200_OK)
+
+    # Setting the access token in an HttpOnly cookie
+    response.set_cookie(
+        key='access_token',
+        value=access_token,
+        httponly=True,  # XSS protection
+        samesite='Lax',
+        max_age=1800,
+    )
+
+    # Setting the refresh token in an HttpOnly cookie
+    response.set_cookie(
+        key='refresh_token',
+        value=refresh_token,
+        httponly=True,
+        samesite='Lax',
+        max_age=86400,
+    )
+    return response
 
 
+# Access Token Refresh
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def refresh_token(request):
+    refresh_token = request.COOKIES.get('refresh_token')
+    if not refresh_token:
+        return Response({
+            'error': 'Refresh токен не найден'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        refresh = RefreshToken(refresh_token)
+        new_access_token = str(refresh.access_token)
+
+        # Creating a response
+        response = Response({
+            'message': 'Access Token updated'
+        }, status=status.HTTP_200_OK)
+
+        # Setting the new access token in a cookie
+        response.set_cookie(
+            key='access_token',
+            value=new_access_token,
+            httponly=True,
+            samesite='Lax',
+            max_age=1800,
+        )
+        return response
+
+    except Exception as e:
+        return Response({
+            'error': 'Invalid refresh Token'
+        }, status=status.HTTP_401_UNAUTHORIZED)
 
 
+# My Tasks
+@api_view(['GET'])
+def my_tasks(request):
+    tasks = Task.objects.filter(owner=request.user).order_by('-created_at')
+    serializer = TaskSerializer(tasks, many=True)
+    return Response(serializer.data)
 
 
+# Returns all SubTask of the current user
+@api_view(['GET'])
+def my_subtasks(request):
+    subtasks = SubTask.objects.filter(owner=request.user).order_by('-created_at')
+    serializer = SubTaskCreateSerializer(subtasks, many=True)
+    return Response(serializer.data)
 
 
+# Logout
+@api_view(['POST'])
+def logout(request):
+    refresh_token = request.COOKIES.get('refresh_token')
+    if refresh_token:
+        try:
+            refresh = RefreshToken(refresh_token)
+            refresh.blacklist()
+        except TokenError:
+            pass
+
+    # Creating response
+    response = Response({
+        'message': 'Logged out successfully'
+    }, status=status.HTTP_200_OK)
+    response.delete_cookie('access_token')
+    response.delete_cookie('refresh_token')
+    return response
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# ViewSet for CRUD
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
