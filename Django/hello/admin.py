@@ -40,8 +40,8 @@ class TaskAdmin(admin.ModelAdmin):
             short = f"{obj.title[:max_length]}"
             return format_html('<span title="{}">{}</span', obj.title, short)
         return obj.title
-    short_title.short_description = "Task name abbreviated"
 
+    short_title.short_description = "Task name abbreviated"
 
     # Show
     list_display = ('id', 'short_title', 'status', 'deadline', 'created_at')
@@ -63,7 +63,6 @@ class TaskAdmin(admin.ModelAdmin):
 
     # Inline forms for SubTasks
     inlines = [SubTaskInline]
-
 
     # Edit
     fieldsets = (
@@ -112,7 +111,7 @@ class SubTaskAdmin(admin.ModelAdmin):
     actions = ['mark_as_done']
 
     # Status changes to Done
-    def mark_as_done(self,request, queryset):
+    def mark_as_done(self, request, queryset):
         count = queryset.update(status=SubTask.Status.DONE)
         self.massage_user(
             request,
@@ -121,4 +120,3 @@ class SubTaskAdmin(admin.ModelAdmin):
 
     # Setting the text in a drop-down list
     mark_as_done.short_description = f"Change the status of the selected SubTask to 'Done'"
-

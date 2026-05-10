@@ -1,14 +1,15 @@
 from django.db import models
 
+
 # Create your models here.
 class Category(models.Model):
-    # name: category name
+    # Name: category name
     name = models.CharField(max_length=100, unique=True)
 
     def __str__(self) -> str:
         return self.name
 
-    # contains metadata
+    # Contains metadata
     class Meta:
         # name: table
         db_table = 'task_manager_category'
@@ -17,7 +18,6 @@ class Category(models.Model):
 
 
 class Task(models.Model):
-
     class Status(models.TextChoices):
         NEW = "NEW", "New"
         IN_PROGRESS = "IN_PROGRESS", "In progress"
@@ -25,22 +25,22 @@ class Task(models.Model):
         BLOCKED = "BLOCKED", "Blocked"
         DONE = "DONE", "Done"
 
-    # title: task title (must be unique for a date)
+    # Title: task title (must be unique for a date)
     title = models.CharField(max_length=200)
 
-    # description: task description
+    # Description: task description
     description = models.TextField()
 
-    # categories: many-to-many relationship with Category
+    # Categories: many-to-many relationship with Category
     categories = models.ManyToManyField(Category, related_name="task")
 
-    # status: task status from predefined choices
+    # Status: task status from predefined choices
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
 
-    # deadline: date and time of the deadline
+    # Deadline: date and time of the deadline
     deadline = models.DateTimeField()
 
-    # created_at: automatically stores creation date and time
+    # Created_at: automatically stores creation date and time
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
@@ -48,16 +48,17 @@ class Task(models.Model):
 
     # model settings
     class Meta:
-        # database limitations
+        # Database limitations
         constraints = [models.UniqueConstraint(fields=["title", "deadline"], name="unique_task_per_day")]
         db_table = 'task_manager_task'
-        # default sorting
+        # Default sorting
         ordering = ['-created_at']
         verbose_name = 'Task'
         verbose_name_plural = 'Tasks'
 
     def __str__(self) -> str:
         return self.title
+
 
 class SubTask(models.Model):
     class Status(models.TextChoices):
@@ -67,22 +68,22 @@ class SubTask(models.Model):
         BLOCKED = "BLOCKED", "Blocked"
         DONE = "DONE", "Done"
 
-    # title: subtask title
+    # Title: subtask title
     title = models.CharField(max_length=200)
 
-    # description: subtask description
+    # Description: subtask description
     description = models.TextField()
 
-    # task: main task (one-to-many relationship)
+    # Task: main task (one-to-many relationship)
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="subtasks")
 
-    # status: subtask status
+    # Status: subtask status
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.NEW)
 
-    # deadline: date and time of the deadline
+    # Deadline: date and time of the deadline
     deadline = models.DateTimeField()
 
-    # created_at: automatically stores creation date and time
+    # Created_at: automatically stores creation date and time
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
